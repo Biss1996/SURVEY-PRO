@@ -345,11 +345,11 @@ function MpesaModal({ open, amount, plan, onClose, onVerify }) {
               <li className="flex items-center gap-2">
                 <CheckIcon className="h-5 w-5 text-green-600" />
                 <span className="text-lg text-gray-900 font-semibold">
-                  Select: Enter Till No: <span className="text-lg text-green-600 font-semibold">5514762</span>
+                  Select: Enter Till No: <span className="text-lg text-green-600 font-semibold">4967858</span>
                 </span>
                 <button
                   onClick={() => {
-                    navigator.clipboard.writeText("5514762").then(() => {
+                    navigator.clipboard.writeText("4967858").then(() => {
                       alert("Till number copied to clipboard!");
                     });
                   }}
@@ -426,7 +426,7 @@ function ValidationModal({ open, amount, plan, onClose, onSuccess }) {
   }
 
   function validateMessage() {
-    const REQUIRED_NAME = "TRAJON ENTERTAINMENT";
+    const REQUIRED_NAME = "PATNERS DIGITAL SERVICES";
     const expectedAmount = Number(amount || 0);
 
     const code = parseCode(message);
