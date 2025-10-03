@@ -1,25 +1,22 @@
 // src/App.jsx
 import { Route, Routes, Navigate } from "react-router-dom";
-import { ToastContainer, toast } from "react-toastify";
+import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-
 import { useEffect, useState, useRef } from "react";
 import { useAdmin } from "./context/AdminContext";
-
 import Navbar from "./components/Navbar";
 import Footer from "./components/Footer";
-
 import Home from "./pages/Home";
 import Surveys from "./pages/Surveys";
-import SurveyFlow from "./pages/SurveyFlow"; // or TakeSurvey if you're using that page
+import SurveyFlow from "./pages/SurveyFlow";
 import Register from "./pages/Register";
 import Packages from "./pages/Packages";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
-
 import AddSurvey from "./pages/AddSurvey";
 import SurveyManager from "./pages/SurveyManager";
 import AdminLogin from "./pages/AdminLogin";
+import { startWithdrawalToasts, stopWithdrawalToasts } from "./lib/withdrawalToast";
 
 /* --- tiny guard so some routes require a signed-in user --- */
 function isSignedIn() {
@@ -30,6 +27,7 @@ function isSignedIn() {
     return false;
   }
 }
+
 function ProtectedRoute({ children }) {
   return isSignedIn() ? children : <Navigate to="/login" replace />;
 }
@@ -37,61 +35,6 @@ function ProtectedRoute({ children }) {
 /* --- API base: for Option A this reads static /db.json --- */
 const API_BASE = import.meta.env.BASE_URL || "/";
 const SURVEYS_URL = `${API_BASE.replace(/\/+$/, "")}/db.json`;
-
-/* ---------- Randomized "Withdrawal" toast helpers ---------- */
-const kesFmt = new Intl.NumberFormat("en-KE", {
-  style: "currency",
-  currency: "KES",
-  maximumFractionDigits: 0,
-});
-const ri = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
-const pick = (arr) => arr[ri(0, arr.length - 1)];
-
-function randomMaskedMsisdn() {
-  // e.g., 2547XX****901
-  const last3 = String(ri(0, 999)).padStart(3, "0");
-  const mid = pick(["XX", "XY", "XZ", "9X"]);
-  return `2547${mid}****${last3}`;
-}
-function randomAmount() {
-  // bias towards common-looking amounts like 2,500
-  const base = ri(10, 100) * 50; // 500..5000 step 50
-  return pick([2500, base, base]);
-}
-function randomRef() {
-  // Looks like TX9018EF
-  const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const d = () => ri(0, 9);
-  const L = () => letters[ri(0, letters.length - 1)];
-  return `TX${d()}${d()}${d()}${d()}${L()}${L()}`;
-}
-function pushRandomWithdrawalToast() {
-  const msisdn = randomMaskedMsisdn();
-  const amount = randomAmount();
-  const balance = ri(50, 800); // small realistic balance
-  const ref = randomRef();
-
-  toast(
-    <div className="rounded-xl">
-      <div className="text-slate-900 font-bold">Withdrawal</div>
-      <div className="mt-1 text-slate-700">
-        <span className="font-mono tracking-tight">{msisdn}</span> has withdrawn{" "}
-        <span className="font-semibold">{kesFmt.format(amount)}</span>.{" "}
-        New balance: <span className="font-semibold">{kesFmt.format(balance)}</span>.{" "}
-        Ref. <span className="font-mono">{ref}</span>
-      </div>
-    </div>,
-    {
-      // subtle border & bg similar to your screenshot
-      className:
-        "rounded-xl border border-amber-200 shadow-lg bg-white !text-slate-800",
-      autoClose: 4500,
-      closeOnClick: true,
-      pauseOnHover: true,
-      hideProgressBar: true,
-    }
-  );
-}
 
 function App() {
   // Admin-facing surveys state (for manager page)
@@ -110,19 +53,13 @@ function App() {
       .catch(() => toast.error("Failed to fetch surveys"));
   }, []);
 
-  /* ---------- GLOBAL random withdrawal toasts (every 8s, tab visible) ---------- */
+  /* ---------- GLOBAL random withdrawal toasts (every 45s, tab visible) ---------- */
   const startedRef = useRef(false);
   useEffect(() => {
     if (startedRef.current) return; // prevent duplicate intervals in StrictMode dev
     startedRef.current = true;
-
-    const tick = () => {
-      if (document.visibilityState === "visible") {
-        pushRandomWithdrawalToast();
-      }
-    };
-    const id = setInterval(tick, 15000);
-    return () => clearInterval(id);
+    startWithdrawalToasts();
+    return () => stopWithdrawalToasts();
   }, []);
 
   /* ---------- Admin actions (require a real API; Option A won't persist) ---------- */
@@ -157,23 +94,15 @@ function App() {
   }
 
   return (
-    <div
-      className="
-        min-h-screen min-h-dvh flex flex-col
-        bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(99,102,241,0.08),transparent_60%),radial-gradient(800px_500px_at_90%_0%,rgba(16,185,129,0.08),transparent_55%),linear-gradient(to_bottom,#f8fafc,#eef2ff)]
-      "
-    >
+    <div className="min-h-screen min-h-dvh flex flex-col bg-[radial-gradient(1200px_600px_at_10%_-10%,rgba(99,102,241,0.08),transparent_60%),radial-gradient(800px_500px_at_90%_0%,rgba(16,185,129,0.08),transparent_55%),linear-gradient(to_bottom,#f8fafc,#eef2ff)]">
       <Navbar />
-
       {/* Fluid, responsive page wrapper */}
       <main className="flex-grow w-full max-w-screen-2xl mx-auto px-3 sm:px-6 lg:px-8 py-6">
         <Routes>
           <Route path="/" element={<Home />} />
-
           {/* Public survey browsing */}
           <Route path="/surveys" element={<Surveys />} />
           <Route path="/home" element={<Surveys />} />
-
           {/* Taking a survey requires login — support BOTH paths */}
           <Route
             path="/survey/:id"
@@ -191,7 +120,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           {/* User */}
           <Route path="/packages" element={<Packages />} />
           <Route
@@ -202,11 +130,9 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           {/* Auth */}
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
-
           {/* Admin-only routes */}
           <Route
             path="/add-survey"
@@ -227,14 +153,11 @@ function App() {
             }
           />
           <Route path="/admin-login" element={<AdminLogin />} />
-
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
-
       <Footer />
-
       {/* Global toast container (top-right) */}
       <ToastContainer position="top-right" autoClose={4500} hideProgressBar />
     </div>

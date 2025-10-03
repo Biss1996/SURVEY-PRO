@@ -1,10 +1,10 @@
-// src/lib/withdrawalToast.js
-import toast from "react-hot-toast";
+// src/lib/withdrawalToast.jsx
+import { toast } from "react-toastify";
 
 const kes = new Intl.NumberFormat("en-KE", {
   style: "currency",
   currency: "KES",
-  maximumFractionDigits: 0
+  maximumFractionDigits: 0,
 });
 
 function randInt(min, max) {
@@ -47,9 +47,8 @@ export function startWithdrawalToasts() {
   if (toastInterval) {
     clearInterval(toastInterval);
   }
-
   pushRandomWithdrawalToast();
-  toastInterval = setInterval(pushRandomWithdrawalToast, 25000);
+  toastInterval = setInterval(pushRandomWithdrawalToast, 45000); // 45 seconds
 }
 
 export function stopWithdrawalToasts() {
@@ -66,29 +65,20 @@ export function pushRandomWithdrawalToast() {
   const ref = randomRef();
 
   toast(
-    <div className="w-[240px] p-2 text-xs">
-      <div className="font-bold text-slate-800">Withdrawal</div>
+    <div className="rounded-xl border border-amber-200 shadow-lg bg-white !text-slate-800">
+      <div className="text-green-900 font-bold">Withdrawal</div>
       <div className="mt-1 text-slate-700">
-        <span className="font-mono">{msisdn}</span> withdrew{" "}
+        <span className="font-mono tracking-tight">{msisdn}</span> has withdrawn{" "}
         <span className="font-semibold">{kes.format(amount)}</span>.{" "}
-        Balance: <span className="font-semibold">{kes.format(balance)}</span>.{" "}
-        Ref: <span className="font-mono">{ref}</span>
+        New balance: <span className="font-semibold">{kes.format(balance)}</span>.{" "}
+        Ref. <span className="font-mono">{ref}</span>
       </div>
     </div>,
     {
-      position: 'top-right',
-      duration: 5000,
-      id: 'withdrawal-toast-' + Date.now(),
-      style: {
-        minWidth: '240px',
-        maxWidth: '240px',
-        padding: '8px 12px',
-        fontSize: '12px',
-        borderRadius: '8px',
-        border: '1px solid #fde68a',
-        background: '#fff',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
-      }
+      autoClose: 5000,
+      closeOnClick: true,
+      pauseOnHover: true,
+      hideProgressBar: true,
     }
   );
 }
