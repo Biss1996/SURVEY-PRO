@@ -117,10 +117,9 @@ export function canStartSurvey(surveyId) {
   return (daily[today] || 0) < limit;
 }
 export function ensureNotCompleted(surveyId) {
-  if (!canStartSurvey(surveyId)) {
-    const user = getUser();
-    const limit = PACKAGE_LIMITS[user.tier] || 0;
-    throw new Error(`You have reached your daily limit of ${limit} surveys.`);
+  const user = getUser();
+  if (hasCompleted(user.id, surveyId)) {
+    throw new Error("This survey is already completed and cannot be taken again.");
   }
 }
 /* ---------------- DB Loader ---------------- */
