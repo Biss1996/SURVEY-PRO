@@ -1,15 +1,19 @@
 // src/lib/surveys.js
 const SURVEYS_VERSION_KEY = "surveys:version";
+const DAILY_COMPLETIONS_KEY = "surveys.dailyCompletions.v1";
 const DB_URL = (() => {
   const base = (import.meta?.env?.BASE_URL ?? "/").toString();
   const normBase = (base.startsWith("/") ? base : `/${base}`).replace(/\/+$/, "");
-  return `${normBase}/db.json`; // -> "/db.json" or "/subpath/db.json"
+  return `${normBase}/db.json`;
 })();
-
 export const USER_KEY = "app:user";
-const COMPLETIONS_KEY = "surveys.completions.v1"; // { [userId]: { [surveyId]: { answers, completedAt } } }
-
-/* ---------------- user helpers ---------------- */
+const COMPLETIONS_KEY = "surveys.completions.v1";
+const PACKAGE_LIMITS = {
+  free: 1,
+  silver: 5,
+  gold: 10,
+  platinum: 20,
+};
 export function getUser() {
   try {
     const u = JSON.parse(localStorage.getItem(USER_KEY) || "null");
@@ -20,20 +24,19 @@ export function getUser() {
     name: "Guest",
     email: "",
     plan: "free",
+    tier: "free",
     balance: 0,
     createdAt: Date.now(),
   };
   localStorage.setItem(USER_KEY, JSON.stringify(fresh));
   return fresh;
 }
-
 export function setUser(patch) {
   const u = { ...getUser(), ...patch };
   localStorage.setItem(USER_KEY, JSON.stringify(u));
   return u;
 }
-
-/* ---------------- completions ---------------- */
+/* ---------------- Completions ---------------- */
 function readCompletions() {
   try {
     return JSON.parse(localStorage.getItem(COMPLETIONS_KEY) || "{}");
@@ -57,8 +60,8 @@ export function markCompleted(userId, surveyId, answers = {}) {
   all[userId] = all[userId] || {};
   all[userId][surveyId] = { answers, completedAt: new Date().toISOString() };
   writeCompletions(all);
-
-  // bump a version so UI screens listening to storage/focus can refresh
+  const today = new Date().toISOString().split("T")[0];
+  incrementDailyCompletions(userId, today);
   try {
     localStorage.setItem(SURVEYS_VERSION_KEY, String(Date.now()));
   } catch {}
@@ -73,72 +76,77 @@ export function resetCompletions(userId) {
     } catch {}
   }
 }
-
-/* Guard helpers: block starting an already-completed survey */
-export function canStartSurvey(surveyId) {
-  const user = getUser();
-  return !hasCompleted(user.id, surveyId);
-}
-
-/**
- * Throws an Error if the current user already completed this survey.
- * Call this at the top of your "start survey" handler.
- */
-export function ensureNotCompleted(surveyId) {
-  if (!canStartSurvey(surveyId)) {
-    throw new Error("This survey is already completed and cannot be taken again.");
+/* ---------------- Daily Completions ---------------- */
+function getDailyCompletions(userId) {
+  try {
+    const daily = JSON.parse(localStorage.getItem(DAILY_COMPLETIONS_KEY) || "{}");
+    return daily[userId] || {};
+  } catch {
+    return {};
   }
 }
-
-/* ---------------- db.json loader ---------------- */
+function incrementDailyCompletions(userId, date) {
+  const daily = getDailyCompletions(userId);
+  daily[date] = (daily[date] || 0) + 1;
+  localStorage.setItem(DAILY_COMPLETIONS_KEY, JSON.stringify({ [userId]: daily }));
+}
+function resetDailyCompletionsIfNeeded(userId) {
+  const today = new Date().toISOString().split("T")[0];
+  const daily = getDailyCompletions(userId);
+  Object.keys(daily).forEach((date) => {
+    if (date !== today) delete daily[date];
+  });
+  localStorage.setItem(DAILY_COMPLETIONS_KEY, JSON.stringify({ [userId]: daily }));
+}
+export function getRemainingSurveys(userId) {
+  const user = getUser();
+  const today = new Date().toISOString().split("T")[0];
+  resetDailyCompletionsIfNeeded(userId);
+  const daily = getDailyCompletions(userId);
+  const limit = PACKAGE_LIMITS[user.tier] || 0;
+  return Math.max(0, limit - (daily[today] || 0));
+}
+/* ---------------- Guard Helpers ---------------- */
+export function canStartSurvey(surveyId) {
+  const user = getUser();
+  if (hasCompleted(user.id, surveyId)) return false;
+  const today = new Date().toISOString().split("T")[0];
+  resetDailyCompletionsIfNeeded(user.id);
+  const daily = getDailyCompletions(user.id);
+  const limit = PACKAGE_LIMITS[user.tier] || 0;
+  return (daily[today] || 0) < limit;
+}
+export function ensureNotCompleted(surveyId) {
+  if (!canStartSurvey(surveyId)) {
+    const user = getUser();
+    const limit = PACKAGE_LIMITS[user.tier] || 0;
+    throw new Error(`You have reached your daily limit of ${limit} surveys.`);
+  }
+}
+/* ---------------- DB Loader ---------------- */
 let _dbCache = null;
 export async function loadDB() {
   if (_dbCache) return _dbCache;
-
-  // Avoid stale caching during dev
   const url = DB_URL.includes("?")
     ? `${DB_URL}&_=${Date.now()}`
     : `${DB_URL}?_=${Date.now()}`;
-
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load db.json");
   _dbCache = await res.json();
   return _dbCache;
 }
-
-/* ---------------- mapping for UI ---------------- */
-/**
- * Hydrate surveys from db.json and tag per-user completion.
- * - Keeps all surveys visible
- * - Adds completion/lock metadata for UI to disable retakes
- *
- * Maps:
- *  - db.name        -> title
- *  - db.items       -> questions (array)
- *  - db.payout      -> reward
- *  - db.currency    -> currency
- * Adds:
- *  - questionsCount
- *  - completed (per user)
- *  - status: "completed" | "available"
- *  - locked: boolean (true if completed)
- *  - retakeBlockedReason: string | null
- */
+/* ---------------- UI Mapping ---------------- */
 export async function listSurveysForUser() {
   const user = getUser();
   const completed = getCompletedIds(user.id);
   const db = await loadDB();
-
   return (db.surveys || []).map((s) => {
-    // Compute count robustly: supports items[], questions number, or questions[]
     const count =
       Array.isArray(s.items) ? s.items.length
       : Array.isArray(s.questions) ? s.questions.length
       : Number.isFinite(s.questions) ? s.questions
       : 0;
-
     const isCompleted = completed.has(s.id);
-
     return {
       id: s.id,
       title: s.name || s.title || "Survey",
@@ -149,17 +157,11 @@ export async function listSurveysForUser() {
       currency: (s.currency || "ksh").toLowerCase(),
       questions: Array.isArray(s.items) ? s.items : Array.isArray(s.questions) ? s.questions : [],
       questionsCount: count,
-
-      // per-user completion (do NOT hide; surface for UI)
       completed: isCompleted,
-
-      // helpful UI flags to block retakes while still showing the row
       status: isCompleted ? "completed" : "available",
       locked: isCompleted,
       retakeBlockedReason: isCompleted ? "Already completed. Retakes are not allowed." : null,
     };
   });
 }
-
-/* Expose keys for screens that listen to storage/focus */
-export const KEYS = { SURVEYS_VERSION_KEY, COMPLETIONS_KEY, USER_KEY };
+export const KEYS = { SURVEYS_VERSION_KEY, COMPLETIONS_KEY, USER_KEY, DAILY_COMPLETIONS_KEY };

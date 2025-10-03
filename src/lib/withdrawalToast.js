@@ -1,58 +1,94 @@
 // src/lib/withdrawalToast.js
 import toast from "react-hot-toast";
 
-const kes = new Intl.NumberFormat("en-KE", { style: "currency", currency: "KES", maximumFractionDigits: 0 });
+const kes = new Intl.NumberFormat("en-KE", {
+  style: "currency",
+  currency: "KES",
+  maximumFractionDigits: 0
+});
 
-function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-function randChoice(arr) { return arr[randInt(0, arr.length - 1)]; }
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randChoice(arr) {
+  return arr[randInt(0, arr.length - 1)];
+}
 
 function randomMaskedMsisdn() {
-  // Format like: 2547XX****901 (matches your screenshot style)
   const last3 = String(randInt(0, 999)).padStart(3, "0");
-  const prefixX = randChoice(["XX"]); // slight randomness
+  const prefixX = randChoice(["XX", "YY", "ZZ"]);
   return `2547${prefixX}****${last3}`;
 }
 
 function randomAmount() {
-  // Between 500 and 5,000, step ~50
-  const base = randInt(10, 100) * 50;           // 500..5000
-  // Add some common amounts (e.g., 2,500 as in screenshot) with higher likelihood
-  return randChoice([2500, base, base, base]);
+  const base = randInt(10, 100) * 50;
+  return randChoice([2500, 2500, 1000, 3000, base, base]);
 }
 
 function randomRef() {
   const letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const digits  = "0123456789";
-  const part = () =>
-    letters[randInt(0,25)] + letters[randInt(0,25)] + digits[randInt(0,9)] + digits[randInt(0,9)] + letters[randInt(0,25)] + letters[randInt(0,25)];
-  // Looks like TX9018EF → prefix TX + 6-mix
+  const digits = "0123456789";
   const six = [
-    digits[randInt(0,9)], digits[randInt(0,9)],
-    digits[randInt(0,9)], digits[randInt(0,9)],
-    letters[randInt(0,25)], letters[randInt(0,25)]
+    digits[randInt(0, 9)], digits[randInt(0, 9)],
+    digits[randInt(0, 9)], digits[randInt(0, 9)],
+    letters[randInt(0, 25)], letters[randInt(0, 25)]
   ].join("");
   return `TX${six}`;
 }
 
-export function pushRandomWithdrawalToast() {
-  const msisdn  = randomMaskedMsisdn();
-  const amount  = randomAmount();
-  const balance = randInt(20, 100); // small, feels realistic for “new balance”
-  const ref     = randomRef();
+function randomBalance() {
+  return randInt(0, 100);
+}
 
-  toast.custom((t) => (
-    <div
-      className={`w-[300px] sm:w-[360px] rounded-xl border border-amber-200 bg-white shadow-lg
-                  ${t.visible ? "animate-in fade-in slide-in-from-top-2" : "animate-out fade-out"} `}
-      style={{ padding: "12px 14px" }}
-    >
-      <div className="text-slate-900 font-bold">Withdrawal</div>
+let toastInterval;
+
+export function startWithdrawalToasts() {
+  if (toastInterval) {
+    clearInterval(toastInterval);
+  }
+
+  pushRandomWithdrawalToast();
+  toastInterval = setInterval(pushRandomWithdrawalToast, 25000);
+}
+
+export function stopWithdrawalToasts() {
+  if (toastInterval) {
+    clearInterval(toastInterval);
+    toastInterval = null;
+  }
+}
+
+export function pushRandomWithdrawalToast() {
+  const msisdn = randomMaskedMsisdn();
+  const amount = randomAmount();
+  const balance = randomBalance();
+  const ref = randomRef();
+
+  toast(
+    <div className="w-[240px] p-2 text-xs">
+      <div className="font-bold text-slate-800">Withdrawal</div>
       <div className="mt-1 text-slate-700">
-        <span className="font-mono tracking-tight">{msisdn}</span> has withdrawn{" "}
+        <span className="font-mono">{msisdn}</span> withdrew{" "}
         <span className="font-semibold">{kes.format(amount)}</span>.{" "}
-        New balance: <span className="font-semibold">{kes.format(balance)}</span>.{" "}
-        Ref. <span className="font-mono">{ref}</span>
+        Balance: <span className="font-semibold">{kes.format(balance)}</span>.{" "}
+        Ref: <span className="font-mono">{ref}</span>
       </div>
-    </div>
-  ));
+    </div>,
+    {
+      position: 'top-right',
+      duration: 5000,
+      id: 'withdrawal-toast-' + Date.now(),
+      style: {
+        minWidth: '240px',
+        maxWidth: '240px',
+        padding: '8px 12px',
+        fontSize: '12px',
+        borderRadius: '8px',
+        border: '1px solid #fde68a',
+        background: '#fff',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)'
+      }
+    }
+  );
 }

@@ -1,16 +1,20 @@
 // src/pages/Packages.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 
-/* ---------- Local storage helpers (Option A) ---------- */
+
 const USERS_KEY = "app:users";
 const USER_KEY  = "app:user";
+
 function getLocalUsers() {
   try { return JSON.parse(localStorage.getItem(USERS_KEY) || "[]"); } catch { return []; }
 }
+
 function setLocalUsers(list) {
   localStorage.setItem(USERS_KEY, JSON.stringify(list));
 }
+
 function updateUserLocal(id, partial) {
   const users = getLocalUsers();
   const idx = users.findIndex(u => u.id === id);
@@ -23,7 +27,7 @@ function updateUserLocal(id, partial) {
     localStorage.setItem(USER_KEY, JSON.stringify({ ...cur, ...partial }));
   }
 }
-// Reusable pill with emoji
+
 const TIER_META = {
   free:     { emoji: "🆓",  classes: "bg-green-100 text-green-800" },
   silver:   { emoji: "🥈",  classes: "bg-slate-100 text-slate-700 border border-slate-300" },
@@ -40,7 +44,7 @@ function TierPill({ tier, label }) {
     </span>
   );
 }
-/* ---------- Plans ---------- */
+
 const PLANS = [
   {
     id: "free",
@@ -98,24 +102,56 @@ const PLANS = [
   },
 ];
 
-
-
 export default function Packages() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState(null);
   const [showValidationModal, setShowValidationModal] = useState(false);
-
   const user = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem("app:user") || "null"); } catch { return null; }
+    try { return JSON.parse(localStorage.getItem(USER_KEY) || "null"); } catch { return null; }
   }, []);
 
-  function startPlan(plan) {
-    if (!user) {
-      navigate("/login", { state: { redirectTo: "/packages" } });
+function startPlan(plan) {
+  if (!user) {
+    navigate("/login", { state: { redirectTo: "/packages" } });
+    return;
+  }
+
+  const planHierarchy = ["free", "silver", "gold", "platinum"];
+  const currentPlanIndex = planHierarchy.indexOf(user.tier);
+  const selectedPlanIndex = planHierarchy.indexOf(plan.id);
+
+  if (plan.id === "free") {
+    if (user.tier === "free") {
+      Swal.fire({
+        title: "Upgrade to a Paid Plan",
+        text: "You are currently on the Free plan. Please choose a paid plan to unlock more surveys and benefits!",
+        icon: "info",
+        confirmButtonText: "Got it",
+      });
       return;
     }
-    setSelected(plan);
+    Swal.fire({
+      title: "Downgrade Not Allowed",
+      text: "You cannot downgrade to the Free plan. Please choose another plan.",
+      icon: "warning",
+      confirmButtonText: "Okay",
+    });
+    return;
   }
+
+  if (selectedPlanIndex > currentPlanIndex) {
+    setSelected(plan);
+    return;
+  }
+
+  Swal.fire({
+    title: "Downgrade Not Allowed",
+    text: "You cannot downgrade to a lower plan. Please choose a higher plan to upgrade.",
+    icon: "warning",
+    confirmButtonText: "Okay",
+  });
+}
+
 
   function closeModal() {
     setSelected(null);
@@ -131,7 +167,6 @@ export default function Packages() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
-      {/* Header */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-500 text-white p-6 sm:p-8">
         <div className="max-w-3xl">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">
@@ -144,7 +179,6 @@ export default function Packages() {
         <div className="absolute -right-10 -bottom-10 h-40 w-40 sm:h-56 sm:w-56 rounded-full bg-white/10 blur-2xl" />
       </div>
 
-      {/* Plans grid */}
       <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
         {PLANS.map((p) => {
           const isPopular = p.badge === "Most Popular";
@@ -157,7 +191,6 @@ export default function Packages() {
                 isPopular ? "border-indigo-300 ring-1 ring-indigo-200" : "border-slate-200",
               ].join(" ")}
             >
-              {/* Badge */}
               {p.badge && (
                 <span
                   className={[
@@ -168,7 +201,6 @@ export default function Packages() {
                   {p.badge}
                 </span>
               )}
-              {/* Title & price */}
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-lg sm:text-xl font-semibold truncate">{p.name}</h3>
                 <div className="text-right">
@@ -184,7 +216,6 @@ export default function Packages() {
                 </div>
               </div>
               <div className="my-4 h-px bg-slate-200" />
-              {/* Features */}
               <ul className="space-y-2.5">
                 {p.features.map((f, i) => (
                   <li key={i} className="flex items-start gap-2">
@@ -197,7 +228,6 @@ export default function Packages() {
                   </li>
                 ))}
               </ul>
-              {/* CTA */}
               <button
                 onClick={() => startPlan(p)}
                 className={[
@@ -215,7 +245,6 @@ export default function Packages() {
         })}
       </div>
 
-      {/* M-Pesa payment modal */}
       <MpesaModal
         open={!!selected}
         amount={selected?.priceKsh ?? 0}
@@ -224,16 +253,13 @@ export default function Packages() {
         onVerify={openValidationModal}
       />
 
-      {/* Validation modal — enforces exact business name + amount */}
       <ValidationModal
         open={showValidationModal}
         amount={selected?.priceKsh ?? 0}
         plan={selected}
         onClose={closeValidationModal}
         onSuccess={(parsed) => {
-          // parsed = { code, amount, business }
           try {
-            // Update local user to premium with selected tier
             const sub = {
               provider: "mpesa",
               amount: parsed.amount,
@@ -241,8 +267,8 @@ export default function Packages() {
               business: parsed.business,
               paidAt: Date.now(),
             };
-            updateUserLocal(user.id, { plan: "premium", tier: selected.tier, subscription: sub });
-            alert(`Subscription successful! You are now on ${selected.name}.`);
+            updateUserLocal(user.id, { plan: selected.id, tier: selected.tier, subscription: sub });
+            alert(`Subscription successful! You are now on ${selected.tier}.`);
             navigate("/surveys", { replace: true });
           } catch {
             alert("Failed to update your plan. Please try again.");
@@ -253,27 +279,21 @@ export default function Packages() {
   );
 }
 
-/* ---------- M-Pesa Modal ---------- */
 function MpesaModal({ open, amount, plan, onClose, onVerify }) {
   const [msisdn, setMsisdn] = useState("");
   const [code, setCode] = useState("");
   const dialogRef = useRef(null);
-
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
     if (open) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
-
   useEffect(() => {
     if (open && dialogRef.current) { dialogRef.current.focus(); }
   }, [open]);
-
   if (!open) return null;
-
   const valid = /^0\d{9}$/.test(msisdn) || /^\+?254\d{9}$/.test(msisdn);
   const canPay = (plan?.priceKsh ?? 0) >= 0 && valid && code.trim().length >= 4;
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
@@ -289,7 +309,6 @@ function MpesaModal({ open, amount, plan, onClose, onVerify }) {
                    sm:mx-auto sm:my-12 max-h-[92vh] overflow-y-auto rounded-t-2xl sm:rounded-2xl p-5 sm:p-6"
       >
         <div className="flex flex-col sm:flex-row gap-4">
-          {/* Selected Plan Section */}
           <div className="flex-1 p-4 border rounded-lg bg-indigo-400">
             <h3 className="text-lg text-gray-950 font-semibold mb-4">Selected Plan</h3>
             <ul className="space-y-2">
@@ -325,8 +344,6 @@ function MpesaModal({ open, amount, plan, onClose, onVerify }) {
               </li>
             </ul>
           </div>
-
-          {/* How To Pay Section */}
           <div className="flex-1 p-4 border rounded-lg bg-gray-50">
             <h3 className="text-lg text-gray-900 font-semibold mb-4">How To Pay</h3>
             <ul className="space-y-2">
@@ -365,8 +382,6 @@ function MpesaModal({ open, amount, plan, onClose, onVerify }) {
             </ul>
           </div>
         </div>
-
-        {/* Verify Payment Button */}
         <div className="mt-6 flex justify-center">
           <button
             onClick={onVerify}
@@ -380,59 +395,48 @@ function MpesaModal({ open, amount, plan, onClose, onVerify }) {
   );
 }
 
-/* ---------- Validation Modal ---------- */
 function ValidationModal({ open, amount, plan, onClose, onSuccess }) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const dialogRef = useRef(null);
-
   useEffect(() => {
     function onKey(e) { if (e.key === "Escape") onClose(); }
     if (open) window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
-
   useEffect(() => {
     if (open && dialogRef.current) { dialogRef.current.focus(); }
   }, [open]);
-
   if (!open) return null;
-
   function normalizeName(s) {
     return String(s || "")
       .replace(/\s+/g, " ")
-      .replace(/[.,\s]+$/g, "") // strip trailing punctuation/spaces
+      .replace(/[.,\s]+$/g, "")
       .trim()
       .toUpperCase();
   }
   function parseAmountKsh(s) {
-    // finds first Ksh / KES amount (Ksh400, Ksh 400, Ksh 400.00, with commas)
     const m = String(s).match(/K(?:ES|sh)\s*([\d,]+(?:\.\d{1,2})?)/i);
     if (!m) return null;
     const num = Number(m[1].replace(/,/g, ""));
     return Number.isFinite(num) ? num : null;
   }
   function parseBusiness(s) {
-    // Capture business name after "paid to" and stop at ., , " on ", " at ", or end
     const m = String(s).match(
       /paid\s+to\s+([A-Za-z0-9 '&-]+?)(?=(?:\s*(?:[.,]| on\b| at\b|$)))/i
     );
     return m ? normalizeName(m[1]) : null;
   }
   function parseCode(s) {
-    // e.g., "TIH9AQ1T8F Confirmed."
     const m = String(s).match(/\b([A-Z0-9]{8,})\b\s+Confirmed/i);
     return m ? m[1].toUpperCase() : null;
   }
-
   function validateMessage() {
     const REQUIRED_NAME = "PATNERS DIGITAL SERVICES";
     const expectedAmount = Number(amount || 0);
-
     const code = parseCode(message);
     const amt  = parseAmountKsh(message);
     const biz  = parseBusiness(message);
-
     if (!code) {
       setError("Could not find a valid M-PESA transaction code (e.g., 'TIH9AQ1T8F').");
       return;
@@ -445,17 +449,14 @@ function ValidationModal({ open, amount, plan, onClose, onSuccess }) {
       setError("Could not find the paid amount (e.g., 'Ksh 400.00').");
       return;
     }
-    // Amount must match the selected plan price *exactly*
     const same = Math.abs(amt - expectedAmount) < 0.01;
     if (!same) {
       setError(`Amount mismatch. Expected Ksh ${expectedAmount}, found Ksh ${amt}.`);
       return;
     }
-
     setError("");
     onSuccess({ code, amount: amt, business: biz });
   }
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
@@ -484,7 +485,6 @@ function ValidationModal({ open, amount, plan, onClose, onSuccess }) {
           rows={5}
         />
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-
         <div className="mt-4 flex justify-end gap-2">
           <button
             onClick={onClose}
@@ -504,7 +504,6 @@ function ValidationModal({ open, amount, plan, onClose, onSuccess }) {
   );
 }
 
-/* ---------- helpers & tiny icons ---------- */
 function formatKsh(n) {
   try {
     return new Intl.NumberFormat("en-KE", {
