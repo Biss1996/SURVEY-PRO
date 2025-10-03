@@ -96,41 +96,42 @@ export default function Surveys() {
   }, [load]);
 
   const showDailyLimitAlert = useCallback(() => {
-    const nextTier = currentPackage.nextTier;
-    const benefitsList = currentPackage.benefits.map(benefit =>
-      `<li style="margin-left: 20px; margin-bottom: 8px; font-size: 14px">${benefit}</li>`
-    ).join('');
+  const nextTier = currentPackage.nextTier;
+  const benefitsList = currentPackage.benefits
+    .map(benefit => `<li style="font-size: 13px; margin-bottom: 4px;">${benefit}</li>`)
+    .join('');
 
-    Swal.fire({
-      title: `Upgrade to ${nextTier ? nextTier.charAt(0).toUpperCase() + nextTier.slice(1) : 'Premium'}`,
-      html: `
-        <div style="text-align: left;">
-          <p>You've completed all ${currentPackage.limit} surveys available for your ${currentTier} plan today.</p>
-          ${nextTier ? `
-            <p style="margin-top: 12px; font-weight: 600;">Upgrade to ${nextTier.charAt(0).toUpperCase() + nextTier.slice(1)} for:</p>
-            <ul style="margin-top: 8px; padding-left: 20px;">${benefitsList}</ul>
-          ` : `
-            <p style="margin-top: 12px; font-weight: 600;">You already have our highest plan!</p>
-            <p style="font-size: 14px; color: #6b7280;">Check back tomorrow for more surveys</p>
-          `}
-        </div>
-      `,
-      icon: "info",
-      showCancelButton: !!nextTier,
-      confirmButtonText: nextTier ? 'Upgrade Now →' : "OK",
-      cancelButtonText: "Stay on Current Plan",
-      reverseButtons: true,
-      customClass: {
-        popup: 'swal2-popup',
-        confirmButton: 'swal2-confirm bg-indigo-600 hover:bg-indigo-700',
-        cancelButton: 'swal2-cancel bg-gray-200 hover:bg-gray-300',
-      }
-    }).then((result) => {
-      if (result.isConfirmed && nextTier) {
-        navigate("/packages");
-      }
-    });
-  }, [navigate, currentTier, currentPackage]);
+  Swal.fire({
+    title: `Daily Limit Reached${nextTier ? ` (Upgrade to ${nextTier.charAt(0).toUpperCase() + nextTier.slice(1)})` : ''}`,
+    html: `
+      <div style="text-align: left; font-size: 14px;">
+        <p style="margin: 4px 0;">You've completed all ${currentPackage.limit} surveys for your ${currentTier} plan today.</p>
+        ${nextTier ? `
+          <p style="margin: 8px 0 4px 0; font-weight: 600; font-size: 14px;">Upgrade for:</p>
+          <ul style="margin: 0; padding-left: 18px;">${benefitsList}</ul>
+        ` : `
+          <p style="margin: 8px 0 0 0; font-size: 13px; color: #6b7280;">Check back tomorrow for more surveys.</p>
+        `}
+      </div>
+    `,
+    icon: "info",
+    showCancelButton: !!nextTier,
+    confirmButtonText: nextTier ? 'Upgrade Now' : "OK",
+    cancelButtonText: "Not Now",
+    reverseButtons: true,
+    customClass: {
+      popup: 'swal2-popup compact-swal',
+      confirmButton: 'swal2-confirm bg-indigo-600 hover:bg-indigo-700',
+      cancelButton: 'swal2-cancel bg-gray-200 hover:bg-gray-300',
+    },
+    width: 360,
+    padding: '12px',
+  }).then((result) => {
+    if (result.isConfirmed && nextTier) {
+      navigate("/packages");
+    }
+  });
+}, [navigate, currentTier, currentPackage]);
 
   const handleStart = useCallback((s) => {
     try {
