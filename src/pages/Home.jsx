@@ -7,7 +7,7 @@ export default function Home() {
       <section className="bg-indigo-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20 text-center">
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-slate-900">
-            Start Earning with Survey Extra
+            Start Earning with Survey Pro
           </h1>
           <p className="mt-3 text-slate-600 text-base sm:text-lg">
             Join 50,000+ users earning real money daily
@@ -53,7 +53,7 @@ export default function Home() {
       <section id="features" className="py-14 lg:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <h2 className="text-center text-indigo-600 text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Why Choose Survey Extra?
+            Why Choose Survey Pro?
           </h2>
 
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -84,7 +84,7 @@ export default function Home() {
               Success Stories
             </h2>
             <p className="mt-2 text-sm sm:text-base text-slate-600">
-              What members in Kenya say about Survey Extra.
+              What members in Kenya say about Survey Pro.
             </p>
           </div>
 
@@ -100,7 +100,7 @@ export default function Home() {
                 name="Sarah Mwanza"
                 nameClassName="text-green-600"
                 amount="Kes 2,000"
-                quote="Survey Extra changed my life! I earn 2000+ shillings weekly doing easy surveys."
+                quote="Survey Pro changed my life! I earn 2000+ shillings weekly doing easy surveys."
               />
             </div>
 

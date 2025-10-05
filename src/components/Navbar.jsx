@@ -49,7 +49,7 @@ export default function Navbar() {
           <span className="h-9 w-9 grid place-items-center rounded-xl bg-indigo-600 text-white font-bold">
             A
           </span>
-          <span className="text-lg font-semibold tracking-tight">Survey Extra</span>
+          <span className="text-lg font-semibold tracking-tight">Survey Pro</span>
         </Link>
 
         {/* Desktop nav */}
